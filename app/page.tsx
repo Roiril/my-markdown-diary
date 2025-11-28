@@ -1,65 +1,92 @@
-import Image from "next/image";
+"use client";
+import { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabaseClient'; // さっき作ったファイルを読み込む
+import ReactMarkdown from 'react-markdown';
+
+// データの型定義（TypeScript用）
+type Post = {
+  id: number;
+  content: string;
+  created_at: string;
+};
 
 export default function Home() {
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [content, setContent] = useState('');
+
+  // 画面が開かれたときに、日記データを取得する
+  useEffect(() => {
+    fetchPosts();
+  }, []);
+
+  // Supabaseから日記データを取ってくる関数
+  const fetchPosts = async () => {
+    const { data, error } = await supabase
+      .from('posts')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) console.log('error', error);
+    if (data) setPosts(data);
+  };
+
+  // 日記を保存する関数
+  const addPost = async () => {
+    if (!content) return;
+    
+    // Supabaseにデータを送る
+    const { error } = await supabase
+      .from('posts')
+      .insert([{ content }]);
+
+    if (error) {
+      alert('エラーが発生しました！Consoleを確認してください');
+      console.log(error);
+    } else {
+      setContent(''); // 入力欄を空にする
+      fetchPosts();   // リストを更新して新しい投稿を表示
+    }
+  };
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+    <main className="min-h-screen bg-gray-100 py-10 px-4">
+      <div className="max-w-2xl mx-auto">
+        <h1 className="text-3xl font-bold text-gray-800 mb-6 text-center">📝 Markdown Diary</h1>
+        
+        {/* 入力エリア */}
+        <div className="bg-white p-6 rounded-lg shadow-md mb-8">
+          <textarea
+            className="w-full h-32 p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800"
+            placeholder="今日は何を学びましたか？ markdownが使えます（# タイトル, **太字** など）"
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+          />
+          <button 
+            onClick={addPost}
+            className="mt-3 w-full bg-blue-600 text-white font-bold py-2 px-4 rounded hover:bg-blue-700 transition duration-200"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+            日記を保存する
+          </button>
         </div>
-      </main>
-    </div>
+
+        {/* 日記一覧エリア */}
+        <div className="space-y-4">
+          {posts.map((post) => (
+            <div key={post.id} className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+              <p className="text-xs text-gray-400 mb-2 border-b pb-2">
+                {new Date(post.created_at).toLocaleString('ja-JP')}
+              </p>
+              {/* ここでMarkdownとして表示 */}
+              <div className="prose prose-sm max-w-none text-gray-700">
+                <ReactMarkdown>{post.content}</ReactMarkdown>
+              </div>
+            </div>
+          ))}
+          {posts.length === 0 && (
+            <p className="text-center text-gray-500">まだ日記はありません。最初の投稿を書いてみましょう！</p>
+          )}
+        </div>
+      </div>
+    </main>
   );
 }
