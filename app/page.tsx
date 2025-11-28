@@ -51,7 +51,7 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-gray-100 py-10 px-4">
       <div className="max-w-2xl mx-auto">
-        <h1 className="text-3xl font-bold text-gray-800 mb-6 text-center">📝 Markdown Diary</h1>
+        <h1 className="text-3xl font-bold text-gray-800 mb-6 text-center">📝 Markdown Diary v1</h1>
         
         {/* 入力エリア */}
         <div className="bg-white p-6 rounded-lg shadow-md mb-8">
