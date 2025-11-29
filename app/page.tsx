@@ -1,268 +1,161 @@
 "use client";
-import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabaseClient';
-import ReactMarkdown from 'react-markdown';
-
-// データの型定義
-type Post = {
-  id: number;
-  content: string;
-  created_at: string;
-  user_id: string;
-};
+import Link from 'next/link';
 
 export default function Home() {
-  const [posts, setPosts] = useState<Post[]>([]);
-  const [content, setContent] = useState('');
-  const [user, setUser] = useState<any>(null);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [isSignUp, setIsSignUp] = useState(false);
-
-  // 編集機能用の状態（State）
-  const [editingPost, setEditingPost] = useState<Post | null>(null);
-  const [editingContent, setEditingContent] = useState('');
-
-  // 初回読み込みとログイン監視
-  useEffect(() => {
-    checkUser();
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-      if (session?.user) fetchPosts();
-    });
-    return () => subscription.unsubscribe();
-  }, []);
-
-  const checkUser = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    setUser(session?.user ?? null);
-    if (session?.user) fetchPosts();
-  };
-
-  const fetchPosts = async () => {
-    const { data, error } = await supabase
-      .from('posts')
-      .select('*')
-      .order('created_at', { ascending: false });
-    if (data) setPosts(data);
-  };
-
-  // 認証関連（サインアップ・サインイン・ログアウト）
-  const handleSignUp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    const { error } = await supabase.auth.signUp({ email, password });
-    if (error) alert('登録エラー: ' + error.message);
-    else alert('登録完了！自動でログインします。');
-    setLoading(false);
-  };
-
-  const handleSignIn = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) alert('ログインエラー: ' + error.message);
-    setLoading(false);
-  };
-
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    setUser(null);
-    setPosts([]);
-  };
-
-  // 📝 投稿処理
-  const addPost = async () => {
-    if (!content || !user) return;
-    const { error } = await supabase
-      .from('posts')
-      .insert([{ content, user_id: user.id }]);
-
-    if (error) {
-      alert('エラーが発生しました: ' + error.message);
-    } else {
-      setContent('');
-      fetchPosts();
-    }
-  };
-
-  // 🗑️ 削除処理
-  const deletePost = async (id: number) => {
-    if (!confirm('本当に削除しますか？')) return;
-    
-    const { error } = await supabase
-      .from('posts')
-      .delete()
-      .eq('id', id);
-
-    if (error) alert('削除エラー: ' + error.message);
-    else fetchPosts();
-  };
-
-  // ✏️ 編集モード開始
-  const startEditing = (post: Post) => {
-    setEditingPost(post);
-    setEditingContent(post.content);
-  };
-
-  // ✏️ 編集保存処理
-  const updatePost = async () => {
-    if (!editingPost) return;
-
-    const { error } = await supabase
-      .from('posts')
-      .update({ content: editingContent })
-      .eq('id', editingPost.id);
-
-    if (error) {
-      alert('更新エラー: ' + error.message);
-    } else {
-      setEditingPost(null); // 編集モード終了
-      setEditingContent('');
-      fetchPosts();
-    }
-  };
-
-  // ── ログイン画面 ──
-  if (!user) {
-    return (
-      <main className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-        <div className="max-w-md w-full space-y-8 bg-white p-8 rounded-xl shadow-lg">
-          <div className="text-center">
-            <h2 className="text-3xl font-extrabold text-gray-900">
-              {isSignUp ? 'アカウント作成' : 'ログイン'}
-            </h2>
-            <p className="mt-2 text-sm text-gray-600">Markdown Diaryへようこそ</p>
-          </div>
-          <form className="mt-8 space-y-6" onSubmit={isSignUp ? handleSignUp : handleSignIn}>
-            <div className="rounded-md shadow-sm -space-y-px">
-              <input
-                type="email"
-                required
-                className="appearance-none rounded-t-md relative block w-full px-3 py-2 border border-gray-300 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                placeholder="メールアドレス"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-              <input
-                type="password"
-                required
-                minLength={6}
-                className="appearance-none rounded-b-md relative block w-full px-3 py-2 border border-gray-300 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                placeholder="パスワード（6文字以上）"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            </div>
-            <button type="submit" disabled={loading} className="w-full py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50">
-              {loading ? '処理中...' : (isSignUp ? '登録する' : 'ログイン')}
-            </button>
-          </form>
-          <div className="text-center">
-            <button onClick={() => setIsSignUp(!isSignUp)} className="text-sm text-blue-600 hover:text-blue-500">
-              {isSignUp ? 'ログインへ戻る' : 'アカウントを作成する'}
-            </button>
-          </div>
-        </div>
-      </main>
-    );
-  }
-
-  // ── 日記アプリ画面 ──
   return (
-    <main className="min-h-screen bg-gray-100 py-10 px-4">
-      <div className="max-w-2xl mx-auto">
-        {/* ヘッダー */}
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold text-gray-800">📝 Markdown Diary</h1>
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-gray-600 hidden sm:inline">{user.email}</span>
-            <button onClick={handleSignOut} className="text-sm text-red-500 hover:text-red-700 underline">
-              ログアウト
-            </button>
-          </div>
-        </div>
-        
-        {/* 新規投稿エリア */}
-        <div className="bg-white p-6 rounded-lg shadow-md mb-8">
-          <textarea
-            className="w-full h-32 p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800"
-            placeholder="今日は何を学びましたか？"
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-          />
-          <button onClick={addPost} className="mt-3 w-full bg-blue-600 text-white font-bold py-2 px-4 rounded hover:bg-blue-700 transition duration-200">
-            日記を保存する
-          </button>
-        </div>
+    <main className="relative min-h-screen text-gray-100 font-sans overflow-hidden">
 
-        {/* 投稿一覧エリア */}
-        <div className="space-y-4">
-          {posts.map((post) => (
-            <div key={post.id} className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 relative group">
+      {/* ▼▼▼ 背景画像の層（修正部分） ▼▼▼ */}
+      <div 
+        className="absolute inset-0 z-0"
+        style={{
+          backgroundImage: "url('/images/Roil_hci_icon.png')", 
+          // 'cover' から 'contain' に変更：画像全体が見えるように縮小・拡大する
+          backgroundSize: 'contain',   
+          // 画像を繰り返さない
+          backgroundRepeat: 'no-repeat',
+          // 真ん中に置く
+          backgroundPosition: 'center', 
+          // 余ったスペースは黒くする
+          backgroundColor: '#000',
+          // ぼかしと明るさ調整（ここはお好みで調整してください）
+          filter: 'blur(4px) brightness(0.7)', 
+        }}
+      ></div>
+      {/* ▲▲▲ ここまで ▲▲▲ */}
+
+
+      {/* ▼▼▼ オーバーレイ層（変更なし） ▼▼▼ */}
+      <div className="absolute inset-0 bg-black/60 z-10"></div>
+      {/* ▲▲▲ ここまで ▲▲▲ */}
+
+
+      {/* ▼▼▼ コンテンツ層（変更なし） ▼▼▼ */}
+      <div className="relative z-20">
+
+        {/* ヒーローセクション */}
+        <section className="flex flex-col items-center justify-center h-screen px-4">
+          <div className="text-center space-y-4">
+            <h1 className="text-5xl font-extrabold tracking-tight text-white sm:text-6xl drop-shadow-lg">
+               <span className="text-blue-400">Shiroishi</span> Lab
+            </h1>
+            <p className="text-xl text-gray-300 max-w-2xl mx-auto drop-shadow-md">
+              明治大学/先端メディアサイエンス学科
+              <br />
+              面白いと思ったものを作る。
+            </p>
+            <div className="mt-8 flex justify-center gap-4">
+              <a href="#works" className="px-6 py-3 rounded-full bg-blue-600 text-white font-medium hover:bg-blue-700 transition shadow-lg">
+                View Works
+              </a>
+              <a href="#contact" className="px-6 py-3 rounded-full border border-gray-400 text-gray-200 hover:bg-white/10 transition shadow-lg">
+                Contact Me
+              </a>
+            </div>
+          </div>
+        </section>
+
+        {/* Aboutセクション */}
+        <section id="about" className="py-20 px-6 max-w-4xl mx-auto">
+          <h2 className="text-3xl font-bold mb-8 text-center text-white drop-shadow-md">About Me</h2>
+          <div className="bg-black/50 p-8 rounded-2xl shadow-lg border border-gray-700 backdrop-blur-sm">
+            <p className="leading-relaxed text-gray-300 mb-4">
+              はじめまして。明治大学の先端メディアサイエンス学科に所属しています。
+              大学ではヒューマンコンピューターインタラクション(HCI)の研究をしつつ、個人開発でUnityやWebアプリケーションを作っています。
+            </p>
+            <p className="leading-relaxed text-gray-300">
+              このサイトはNext.jsとSupabaseで作ってVercelで公開しています。 <br />
+              「面白いと思ったもの」をこれからはいっぱい作っていこうと思います。
+            </p>
+            
+            <div className="mt-6">
+              <h3 className="font-bold text-white mb-2">Technical Skills</h3>
+              <div className="flex flex-wrap gap-2">
+                {['Unity', 'TypeScript', 'Next.js', 'React', 'Supabase','C#' ,'Python', 'Git'].map((skill) => (
+                  <span key={skill} className="px-3 py-1 bg-gray-800 text-gray-300 rounded-md text-sm border border-gray-700">
+                    {skill}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Worksセクション */}
+        <section id="works" className="py-20 px-6">
+          <div className="max-w-4xl mx-auto">
+            <h2 className="text-3xl font-bold mb-12 text-center text-white drop-shadow-md">Works</h2>
+            <div className="grid md:grid-cols-2 gap-8">
               
-              {/* 編集モードかどうかで表示を切り替え */}
-              {editingPost?.id === post.id ? (
-                // 編集モードの表示
-                <div className="space-y-3">
-                  <textarea
-                    className="w-full h-32 p-3 border border-blue-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800 bg-blue-50"
-                    value={editingContent}
-                    onChange={(e) => setEditingContent(e.target.value)}
-                  />
-                  <div className="flex justify-end gap-2">
-                    <button 
-                      onClick={() => setEditingPost(null)} 
-                      className="px-3 py-1 text-sm text-gray-600 hover:bg-gray-100 rounded"
-                    >
-                      キャンセル
-                    </button>
-                    <button 
-                      onClick={updatePost} 
-                      className="px-3 py-1 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded"
-                    >
-                      更新を保存
-                    </button>
+              {/* 作品1: Markdown Diary */}
+              <div className="bg-black/50 rounded-xl overflow-hidden shadow-lg border border-gray-700 backdrop-blur-sm hover:border-blue-500 transition">
+                <div className="h-48 bg-blue-900/30 flex items-center justify-center">
+                  <span className="text-4xl">📝</span>
+                </div>
+                <div className="p-6">
+                  <h3 className="text-xl font-bold mb-2 text-white">Markdown Diary</h3>
+                  <p className="text-gray-400 text-sm mb-4">
+                    Next.jsとSupabaseで構築した、マークダウン記法対応の日記アプリ。
+                    認証機能、CRUD処理、RLSによるセキュリティ設定を実装しました。
+                  </p>
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    <span className="text-xs px-2 py-1 bg-blue-900/50 text-blue-300 rounded border border-blue-800">Next.js</span>
+                    <span className="text-xs px-2 py-1 bg-green-900/50 text-green-300 rounded border border-green-800">Supabase</span>
+                  </div>
+                  <div className="flex gap-4">
+                    <a href="https://my-markdown-diary.vercel.app" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline text-sm">
+                      Live Demo →
+                    </a>
+                    <a href="https://github.com/YourName/my-markdown-diary" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:underline text-sm">
+                      GitHub →
+                    </a>
                   </div>
                 </div>
-              ) : (
-                // 通常モードの表示
-                <>
-                  <div className="flex justify-between items-start mb-2 border-b pb-2">
-                    <p className="text-xs text-gray-400">
-                      {new Date(post.created_at).toLocaleString('ja-JP')}
-                    </p>
-                    
-                    {/* 操作ボタン（自分の投稿の場合のみ表示） */}
-                    {user.id === post.user_id && (
-                      <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button 
-                          onClick={() => startEditing(post)}
-                          className="text-blue-500 hover:text-blue-700 text-sm"
-                          title="編集"
-                        >
-                          ✏️
-                        </button>
-                        <button 
-                          onClick={() => deletePost(post.id)}
-                          className="text-red-500 hover:text-red-700 text-sm"
-                          title="削除"
-                        >
-                          🗑️
-                        </button>
-                      </div>
-                    )}
+              </div>
+
+              {/* 作品2: My Portfolio */}
+              <div className="bg-black/50 rounded-xl overflow-hidden shadow-lg border border-gray-700 backdrop-blur-sm hover:border-purple-500 transition">
+                <div className="h-48 bg-purple-900/30 flex items-center justify-center">
+                  <span className="text-4xl">👤</span>
+                </div>
+                <div className="p-6">
+                  <h3 className="text-xl font-bold mb-2 text-white">My Portfolio</h3>
+                  <p className="text-gray-400 text-sm mb-4">
+                    自分自身の経歴と作品を紹介するポートフォリオサイト。
+                    シンプルで見やすいデザインを心がけました。
+                  </p>
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    <span className="text-xs px-2 py-1 bg-blue-900/50 text-blue-300 rounded border border-blue-800">Next.js</span>
+                    <span className="text-xs px-2 py-1 bg-purple-900/50 text-purple-300 rounded border border-purple-800">Tailwind CSS</span>
                   </div>
-                  
-                  <div className="prose prose-sm max-w-none text-gray-700">
-                    <ReactMarkdown>{post.content}</ReactMarkdown>
-                  </div>
-                </>
-              )}
+                </div>
+              </div>
+
             </div>
-          ))}
-        </div>
+          </div>
+        </section>
+
+        {/* Contactセクション */}
+        <section id="contact" className="py-20 px-6 max-w-2xl mx-auto text-center">
+          <h2 className="text-3xl font-bold mb-8 text-white drop-shadow-md">Contact</h2>
+          <p className="text-gray-300 mb-8">
+            HCI関連の研究や開発について、お気軽にご連絡ください。
+          </p>
+          <div className="flex justify-center gap-6">
+            <a href="https://www.youtube.com/@Roil_HCI" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-gray-300 hover:text-red-400 transition">
+              <span className="text-xl">📺</span> YouTube
+            </a>
+            <a href="https://x.com/Roil_HCI" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-gray-300 hover:text-blue-400 transition">
+              <span className="text-xl">✖</span> X (Twitter)
+            </a>
+          </div>
+        </section>
+
+        {/* フッター */}
+        <footer className="py-8 text-center text-gray-500 text-sm border-t border-gray-800">
+          © {new Date().getFullYear()} Shiroishi Lab / Roil. All rights reserved.
+        </footer>
+
       </div>
     </main>
   );
